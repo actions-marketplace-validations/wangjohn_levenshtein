@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "accepted": [
+    {
+      "file": "policy/wallclock.go",
+      "mutator": "CONDITIONALS_NEGATION",
+      "line": "if spec.Path.Value == `\"time\"` {",
+      "function": "importsTime",
+      "reason": "importsTime only skips work: a test file with any import other than time is walked under the negation, every file that can read the clock is still checked, and the findings are the same"
+    }
+  ]
+}
