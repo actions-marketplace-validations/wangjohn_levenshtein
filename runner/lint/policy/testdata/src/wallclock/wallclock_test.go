@@ -455,3 +455,98 @@ func TestRestartedInPost(t *testing.T) {
 		}
 	}
 }
+
+// A pass may read the clock for the end of a measurement; only restarting
+// the start makes the bound a measurement of the pass.
+func TestPollingReadsNow(t *testing.T) {
+	start := time.Now()
+	for !done() {
+		now := time.Now()
+		if now.Sub(start) > 5*time.Second {
+			t.Fatal("timed out waiting")
+		}
+	}
+}
+
+// A range over a channel, such as a ticker's, polls like a condition loop.
+func TestPollingTicker(t *testing.T) {
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	start := time.Now()
+	for range ticker.C {
+		if done() {
+			break
+		}
+		if time.Since(start) > 5*time.Second {
+			t.Fatal("timed out waiting")
+		}
+	}
+	for range ticker.C {
+		begin := time.Now()
+		Work()
+		if time.Since(begin) > time.Second { // want "test asserts on wall-clock elapsed time"
+			t.Fatal("too slow")
+		}
+		break
+	}
+}
+
+// A goroutine or callback in the loop runs when called, not as part of a pass,
+// so a reading assigned there does not restart the loop's clock.
+func TestPollingWithCallback(t *testing.T) {
+	start := time.Now()
+	reset := func() {}
+	for !done() {
+		reset = func() { start = time.Now() }
+		if time.Since(start) > 5*time.Second {
+			t.Fatal("timed out waiting")
+		}
+	}
+	reset()
+}
+
+type timedSuite struct {
+	t *testing.T
+}
+
+func (s timedSuite) T() *testing.T {
+	return s.t
+}
+
+// A testify function's TestingT need not be a test variable.
+func (s timedSuite) checkFast() {
+	start := time.Now()
+	Work()
+	elapsed := time.Since(start)
+	assert.True(s.T(), elapsed < time.Second)   // want "test asserts on wall-clock elapsed time"
+	assert.Greater(s.T(), time.Second, elapsed) // want "test asserts on wall-clock elapsed time"
+	assert.Less(s.T(), 1, 2, "after %v", elapsed)
+}
+
+func checkEventually(c *assert.CollectT, start time.Time) {
+	assert.True(c, time.Since(start) < time.Second) // want "test asserts on wall-clock elapsed time"
+}
+
+// An assertion call in an if condition is reported once, as the call.
+func TestAssertionInCondition(t *testing.T) {
+	start := time.Now()
+	Work()
+	if !assert.True(t, time.Since(start) < time.Second) { // want "test asserts on wall-clock elapsed time"
+		t.FailNow()
+	}
+}
+
+// A failure in a later arm of an else-if chain depends on the bound too.
+func TestFailsInElseIf(t *testing.T) {
+	start := time.Now()
+	Work()
+	elapsed := time.Since(start)
+	ok := elapsed != 0
+	if elapsed < time.Second { // want "test asserts on wall-clock elapsed time"
+		t.Log("fast")
+	} else if ok {
+		t.Log("slow")
+	} else {
+		t.Fatal("clock did not move")
+	}
+}

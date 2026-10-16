@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -73,7 +74,7 @@ func runWallClock(pass *analysis.Pass) (any, error) {
 	for _, file := range tests {
 		// A file that does not import time cannot read the clock, so its
 		// functions need no walk.
-		if !importsTime(file) {
+		if !imports(file, "time") {
 			continue
 		}
 		for _, decl := range file.Decls {
@@ -87,13 +88,10 @@ func runWallClock(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-func importsTime(file *ast.File) bool {
-	for _, spec := range file.Imports {
-		if spec.Path.Value == `"time"` {
-			return true
-		}
-	}
-	return false
+func imports(file *ast.File, path string) bool {
+	return slices.ContainsFunc(file.Imports, func(spec *ast.ImportSpec) bool {
+		return spec.Path.Value == strconv.Quote(path)
+	})
 }
 
 // bubbles is the code a package runs inside synctest.Test or synctest.Run.
@@ -112,6 +110,16 @@ type bubbles struct {
 // everywhere, which keeps a shared helper's fake-clock bounds quiet at the cost
 // of missing its real-clock calls.
 func synctestBodies(pass *analysis.Pass, files []*ast.File) bubbles {
+	found := bubbles{
+		literals: map[*ast.FuncLit]bool{},
+		funcs:    map[types.Object]bool{},
+	}
+	// Most test packages have no bubble; only a file that imports
+	// testing/synctest can start one.
+	if !slices.ContainsFunc(files, func(file *ast.File) bool { return imports(file, "testing/synctest") }) {
+		return found
+	}
+
 	decls := map[types.Object]*ast.FuncDecl{}
 	held := map[types.Object][]*ast.FuncLit{}
 	for _, file := range files {
@@ -142,10 +150,6 @@ func synctestBodies(pass *analysis.Pass, files []*ast.File) bubbles {
 		})
 	}
 
-	found := bubbles{
-		literals: map[*ast.FuncLit]bool{},
-		funcs:    map[types.Object]bool{},
-	}
 	var pending []*ast.BlockStmt
 	addFunc := func(obj types.Object) {
 		if obj == nil || found.funcs[obj] {
@@ -223,14 +227,15 @@ func checkWallClock(pass *analysis.Pass, body *ast.BlockStmt, bubbles bubbles) {
 		}
 		switch n := node.(type) {
 		case *ast.IfStmt:
-			if !canFail(pass, n.Body) && !failingElse(pass, n.Else) {
+			comparison := clock.boundIn(n.Cond)
+			if comparison == nil || !(canFail(pass, n.Body) || failingElse(pass, n.Else)) {
 				return true
 			}
-			if comparison := clock.boundIn(n.Cond); comparison != nil && !clock.polling(comparison, stack) {
+			if !clock.polling(comparison, stack) {
 				pass.Reportf(comparison.Pos(), "%s", wallClockMessage)
 			}
 		case *ast.CallExpr:
-			if bound := clock.assertedBy(pass, n); bound != nil && !clock.polling(bound, stack) {
+			if bound := clock.assertedBy(n); bound != nil && !clock.polling(bound, stack) {
 				pass.Reportf(n.Pos(), "%s", wallClockMessage)
 			}
 		}
@@ -238,38 +243,55 @@ func checkWallClock(pass *analysis.Pass, body *ast.BlockStmt, bubbles bubbles) {
 	})
 }
 
+// failingElse reports whether an else branch can fail the test, following an
+// else-if chain through each arm.
 func failingElse(pass *analysis.Pass, stmt ast.Stmt) bool {
-	block, ok := stmt.(*ast.BlockStmt)
-	return ok && canFail(pass, block)
+	switch s := stmt.(type) {
+	case *ast.BlockStmt:
+		return canFail(pass, s)
+	case *ast.IfStmt:
+		return canFail(pass, s.Body) || failingElse(pass, s.Else)
+	}
+	return false
 }
 
 // polling reports whether bound is how long a test waits for a condition
 // before giving up rather than a claim about how long the code under test
 // takes: the innermost loop around it, within its function, is a three-clause
-// or condition-only for loop that does not restart the clock, so every clock
-// reading the bound depends on was taken before the loop's first pass. A range
-// loop, as in a table-driven test, is not polling.
+// or condition-only for loop, or a range over a channel such as a ticker's,
+// and no pass of it restarts the clock, so the start of every measurement the
+// bound depends on was read before the loop. A pass may still read the clock
+// for the end of a measurement, as in now.Sub(start). Any other range loop,
+// as in a table-driven test, is not polling.
 func (c wallClock) polling(bound ast.Expr, stack []ast.Node) bool {
 	for _, node := range slices.Backward(stack) {
 		switch n := node.(type) {
-		case *ast.FuncLit, *ast.RangeStmt:
+		case *ast.FuncLit:
 			return false
+		case *ast.RangeStmt:
+			if _, ok := c.pass.TypesInfo.TypeOf(n.X).Underlying().(*types.Chan); !ok {
+				return false
+			}
+			return !c.restarts(n.Body, nil, c.startsUnder(bound))
 		case *ast.ForStmt:
-			return !c.restarts(n, c.readingsUnder(bound))
+			return !c.restarts(n.Body, n.Post, c.startsUnder(bound))
 		}
 	}
 	return false
 }
 
-// restarts reports whether a pass of loop, its body or its post statement,
-// assigns one of readings.
-func (c wallClock) restarts(loop *ast.ForStmt, readings map[types.Object]bool) bool {
+// restarts reports whether a pass of a loop, its body or its post statement,
+// assigns one of starts. Function literals in the loop run when something
+// calls them, not as part of the pass, and are not searched.
+func (c wallClock) restarts(body *ast.BlockStmt, post ast.Stmt, starts map[types.Object]bool) bool {
 	assigns := func(lhs ast.Expr) bool {
-		return readings[localVar(c.pass, lhs)]
+		return starts[localVar(c.pass, lhs)]
 	}
 	restarted := false
 	visit := func(node ast.Node) bool {
 		switch n := node.(type) {
+		case *ast.FuncLit:
+			return false
 		case *ast.AssignStmt:
 			restarted = restarted || slices.ContainsFunc(n.Lhs, assigns)
 		case *ast.ValueSpec:
@@ -277,35 +299,42 @@ func (c wallClock) restarts(loop *ast.ForStmt, readings map[types.Object]bool) b
 		}
 		return !restarted
 	}
-	ast.Inspect(loop.Body, visit)
-	if loop.Post != nil {
-		ast.Inspect(loop.Post, visit)
+	ast.Inspect(body, visit)
+	if post != nil {
+		ast.Inspect(post, visit)
 	}
 	return restarted
 }
 
-// readingsUnder returns the clock-reading variables expr depends on, directly,
-// as in time.Since(start), or through the measured variables it uses.
-func (c wallClock) readingsUnder(expr ast.Expr) map[types.Object]bool {
+// startsUnder returns the clock-reading variables that start a measurement
+// expr depends on: the argument of time.Since or of a Sub, directly or through
+// the measured variables expr uses. The end reading of a Sub, such as now in
+// now.Sub(start), is not a start.
+func (c wallClock) startsUnder(expr ast.Expr) map[types.Object]bool {
 	found := map[types.Object]bool{}
 	seen := map[types.Object]bool{}
 	var visit func(ast.Expr)
 	visit = func(expr ast.Expr) {
 		ast.Inspect(expr, func(node ast.Node) bool {
-			ident, ok := node.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			obj := c.pass.TypesInfo.Uses[ident]
-			if seen[obj] {
-				return true
-			}
-			seen[obj] = true
-			found[obj] = c.readings[obj]
-			if c.measured[obj] {
-				for _, value := range c.assigned[obj] {
-					if value != nil {
-						visit(value)
+			switch n := node.(type) {
+			case *ast.CallExpr:
+				if start := c.start(n); start != nil {
+					ast.Inspect(start, func(node ast.Node) bool {
+						if ident, ok := node.(*ast.Ident); ok && c.readings[c.pass.TypesInfo.Uses[ident]] {
+							found[c.pass.TypesInfo.Uses[ident]] = true
+						}
+						return true
+					})
+					return false
+				}
+			case *ast.Ident:
+				obj := c.pass.TypesInfo.Uses[n]
+				if c.measured[obj] && !seen[obj] {
+					seen[obj] = true
+					for _, value := range c.assigned[obj] {
+						if value != nil {
+							visit(value)
+						}
 					}
 				}
 			}
@@ -314,6 +343,19 @@ func (c wallClock) readingsUnder(expr ast.Expr) map[types.Object]bool {
 	}
 	visit(expr)
 	return found
+}
+
+// start returns the reading a measurement starts from: the argument of
+// time.Since(start) or of end.Sub(start). It returns nil for any other call.
+func (c wallClock) start(call *ast.CallExpr) ast.Expr {
+	if packageFunc(c.pass, call, "time", "Since") && len(call.Args) == 1 {
+		return call.Args[0]
+	}
+	method, ok := call.Fun.(*ast.SelectorExpr)
+	if ok && method.Sel.Name == "Sub" && len(call.Args) == 1 && timeMethod(c.pass, call) {
+		return call.Args[0]
+	}
+	return nil
 }
 
 // wallClock tracks, within one function, the variables that hold a reading of
@@ -470,7 +512,7 @@ func (c wallClock) measuredCall(call *ast.CallExpr) bool {
 }
 
 // boundIn returns the first ordered comparison in cond that has a measured
-// duration on either side.
+// duration on either side, outside any assertion call in cond.
 func (c wallClock) boundIn(cond ast.Expr) *ast.BinaryExpr {
 	var found *ast.BinaryExpr
 	ast.Inspect(cond, func(node ast.Node) bool {
@@ -480,6 +522,9 @@ func (c wallClock) boundIn(cond ast.Expr) *ast.BinaryExpr {
 		switch n := node.(type) {
 		case *ast.FuncLit:
 			return false
+		case *ast.CallExpr:
+			// An assertion call in a condition is reported as a call.
+			return c.assertedBy(n) == nil
 		case *ast.BinaryExpr:
 			if ordered[n.Op] && (c.duration(n.X) || c.duration(n.Y)) {
 				found = n
@@ -492,17 +537,23 @@ func (c wallClock) boundIn(cond ast.Expr) *ast.BinaryExpr {
 
 // assertedBy returns the measured duration or comparison call asserts on, or
 // nil. It looks only at the values an assertion compares, which follow the
-// test value, or open the arguments of a testify Assertions method: the first
+// test value or a testify function's TestingT, or open the arguments of a
+// testify Assertions method: the first
 // two of an ordering assertion such as assert.Less, and the first of any other
 // call, such as require.True(t, elapsed < time.Second). Trailing message
 // arguments, such as the "took %v", elapsed of assert.Less(t, n, 10, "took
 // %v", elapsed), are not asserted on.
-func (c wallClock) assertedBy(pass *analysis.Pass, call *ast.CallExpr) ast.Expr {
+func (c wallClock) assertedBy(call *ast.CallExpr) ast.Expr {
 	operands := call.Args
-	if i := slices.IndexFunc(call.Args, func(arg ast.Expr) bool { return testValue(pass, arg) }); i >= 0 {
+	if i := slices.IndexFunc(call.Args, func(arg ast.Expr) bool { return testValue(c.pass, arg) }); i >= 0 {
 		operands = call.Args[i+1:]
-	} else if !testifyCall(pass, call) {
+	} else if fn := testifyFunc(c.pass, call); fn == nil {
 		return nil
+	} else if fn.Signature().Recv() == nil {
+		// A package function such as assert.True takes its TestingT first,
+		// here one that is not a plain test variable, such as s.T() or an
+		// EventuallyWithT callback's *assert.CollectT.
+		operands = call.Args[min(1, len(call.Args)):]
 	}
 
 	if orderingAssertions[strings.TrimSuffix(calleeName(call), "f")] {
@@ -524,15 +575,18 @@ func (c wallClock) assertedBy(pass *analysis.Pass, call *ast.CallExpr) ast.Expr 
 	return nil
 }
 
-// testifyCall reports whether call is a method of testify's assert.Assertions
-// or require.Assertions, which hold the test value themselves.
-func testifyCall(pass *analysis.Pass, call *ast.CallExpr) bool {
-	fn := typeutil.Callee(pass.TypesInfo, call)
-	if fn == nil || fn.Pkg() == nil {
-		return false
+// testifyFunc returns the testify assert or require function or method call
+// calls, or nil.
+func testifyFunc(pass *analysis.Pass, call *ast.CallExpr) *types.Func {
+	fn, ok := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+	if !ok || fn.Pkg() == nil {
+		return nil
 	}
 	path := fn.Pkg().Path()
-	return strings.HasSuffix(path, "/testify/assert") || strings.HasSuffix(path, "/testify/require")
+	if strings.HasSuffix(path, "/testify/assert") || strings.HasSuffix(path, "/testify/require") {
+		return fn
+	}
+	return nil
 }
 
 func calleeName(call *ast.CallExpr) string {

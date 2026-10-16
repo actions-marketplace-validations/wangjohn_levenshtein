@@ -49,3 +49,12 @@ func Equal(t TestingT, expected, actual any, msgAndArgs ...any) bool {
 func (a *Assertions) Lessf(e1, e2 any, msg string, args ...any) bool {
 	return true
 }
+
+func Greater(t TestingT, e1, e2 any, msgAndArgs ...any) bool {
+	return true
+}
+
+// CollectT is the TestingT an EventuallyWithT callback receives.
+type CollectT struct{}
+
+func (c *CollectT) Errorf(format string, args ...any) {}

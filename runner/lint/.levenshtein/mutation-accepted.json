@@ -4,9 +4,9 @@
     {
       "file": "policy/wallclock.go",
       "mutator": "CONDITIONALS_NEGATION",
-      "line": "if spec.Path.Value == `\"time\"` {",
-      "function": "importsTime",
-      "reason": "importsTime only skips work: a test file with any import other than time is walked under the negation, every file that can read the clock is still checked, and the findings are the same"
+      "line": "return spec.Path.Value == strconv.Quote(path)",
+      "function": "imports",
+      "reason": "imports only skips work: under the negation a file with any other import counts as importing time or testing/synctest, so every file that can read the clock or start a bubble is still searched and the findings are the same"
     }
   ]
 }
