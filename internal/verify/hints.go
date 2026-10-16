@@ -18,6 +18,7 @@ var ruleDocs = map[string]string{
 	"LV1004": rulesDoc + "#a-blank-line-between-declarations-lv1004",
 	"LV1005": rulesDoc + "#formatted-files-lv1005",
 	"LV1006": rulesDoc + "#tests-that-can-fail-lv1006",
+	"LV1007": rulesDoc + "#no-wall-clock-assertions-in-tests-lv1007",
 }
 
 // hints are one-line instructions for codes whose fix is mechanical and well
@@ -32,6 +33,7 @@ var hints = map[string]string{
 	"LV1004":           "add a blank line above the declaration and its doc comment; see " + ruleDocs["LV1004"],
 	"LV1005":           "run gofmt -w {file}; see " + ruleDocs["LV1005"],
 	"LV1006":           "give the test an assertion that can fail, or make its skip conditional; see " + ruleDocs["LV1006"],
+	"LV1007":           "run the code under testing/synctest or inject a clock instead of bounding real elapsed time; see " + ruleDocs["LV1007"],
 	"minmax":           "run go fix -minmax ./... in the module",
 	"mapsloop":         "run go fix -mapsloop ./... in the module",
 	"slicescontains":   "run go fix -slicescontains ./... in the module",

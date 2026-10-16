@@ -132,3 +132,7 @@ func TestSourceNameMapsOnlyCgoRewrites(t *testing.T) {
 		})
 	}
 }
+
+func TestWallClock(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), WallClock, "wallclock")
+}

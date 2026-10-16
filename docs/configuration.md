@@ -190,7 +190,7 @@ A finding whose code has a mechanical, well-known fix carries a one-line `hint` 
 
 | Code | Hint |
 | --- | --- |
-| `LV1001`–`LV1006` | What the rule wants, with a link to its section of [the rules](rules.md) |
+| `LV1001`–`LV1007` | What the rule wants, with a link to its section of [the rules](rules.md) |
 | `LV1005` | `gofmt -w <file>` |
 | `minmax`, `mapsloop`, `slicescontains`, `stringscutprefix`, `stringsseq` | `go fix -<rule> ./...` in the module |
 | `errcheck` | Handle the error, or discard it explicitly with `_ =` and a comment giving the reason |

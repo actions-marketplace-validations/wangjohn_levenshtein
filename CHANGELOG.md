@@ -14,6 +14,14 @@ says which interfaces are versioned and what to expect when you bump your pin.
 
 - Direct links to the published GitHub Marketplace Action from the README and
   consumer CI guide, with consumer examples pinned to v0.3.1.
+- House rule LV1007 reports tests that assert on wall-clock elapsed time,
+  such as `if time.Since(start) > 3600*time.Millisecond { t.Fatal(...) }` or
+  `assert.Less(t, elapsed, time.Second)`, which pass on an idle machine and
+  fail under `-race` or load. Code under `testing/synctest`, durations from an
+  injected clock, logging-only uses, polling loops and benchmarks are not
+  reported. It is on by default, so consumers may see new findings in their
+  tests when they bump their pin; record existing ones in a baseline or
+  suppress them with `//lint:ignore LV1007 <reason>`.
 
 ### Security
 
