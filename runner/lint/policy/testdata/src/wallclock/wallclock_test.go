@@ -274,3 +274,184 @@ func TestUntilDeadline(t *testing.T) {
 		t.Fatal("deadline already passed")
 	}
 }
+
+// Only the compared values count; a duration or comparison in the message
+// arguments is not asserted on.
+func TestMessageArguments(t *testing.T) {
+	start := time.Now()
+	results := []int{1}
+	assert.Less(t, len(results), 10, "after %v", time.Since(start))
+	assert.Equal(t, 1, len(results), "fast=%v", time.Since(start) < time.Second)
+	assert.New(t).Lessf(len(results), 10, "after %v", time.Since(start))
+	assert.New(t).Lessf(time.Since(start), time.Second, "too slow") // want "test asserts on wall-clock elapsed time"
+}
+
+// A loop that restarts the clock each pass measures each pass, so its bound
+// is an assertion, not a polling timeout.
+func TestRepeatedMeasurement(t *testing.T) {
+	for i := 0; i < 3; i++ {
+		start := time.Now()
+		Work()
+		if time.Since(start) > 10*time.Millisecond { // want "test asserts on wall-clock elapsed time"
+			t.Fatal("too slow")
+		}
+	}
+	var start time.Time
+	for attempt := 0; attempt < 3; attempt++ {
+		start = time.Now()
+		Work()
+		elapsed := time.Since(start)
+		assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+	}
+}
+
+// The innermost loop decides: a table loop inside a retry loop is still a
+// table loop.
+func TestTableInsideCounterLoop(t *testing.T) {
+	for attempt := 0; attempt < 3; attempt++ {
+		for _, budget := range []time.Duration{time.Second} {
+			start := time.Now()
+			Work()
+			if time.Since(start) > budget { // want "test asserts on wall-clock elapsed time"
+				t.Errorf("over %v", budget)
+			}
+		}
+	}
+}
+
+// A polling timeout written as an assertion call is exempt like the if form.
+func TestPollingWithAssertion(t *testing.T) {
+	start := time.Now()
+	for !done() {
+		assert.Less(t, time.Since(start), 5*time.Second)
+		elapsed := time.Since(start)
+		assert.True(t, elapsed < 5*time.Second)
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestSynctestHelper(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requireFastInBubble(t)
+	})
+}
+
+// requireFastInBubble is only reached from a bubble, so its clock is fake.
+func requireFastInBubble(t *testing.T) {
+	t.Helper()
+	start := time.Now()
+	time.Sleep(time.Second)
+	elapsedInBubble(t, start)
+}
+
+// elapsedInBubble is bubble code two calls deep.
+func elapsedInBubble(t *testing.T, start time.Time) {
+	t.Helper()
+	if time.Since(start) > time.Second {
+		t.Fatal("too slow")
+	}
+}
+
+func TestSynctestHeldLiteral(t *testing.T) {
+	body := func(t *testing.T) {
+		start := time.Now()
+		time.Sleep(time.Second)
+		if time.Since(start) > time.Second {
+			t.Fatal("too slow")
+		}
+	}
+	synctest.Test(t, body)
+}
+
+type suite struct {
+	budget time.Duration
+}
+
+func (s suite) run(t *testing.T) {
+	start := time.Now()
+	time.Sleep(s.budget)
+	if time.Since(start) > s.budget {
+		t.Fatal("too slow")
+	}
+}
+
+func TestSynctestMethodValue(t *testing.T) {
+	s := suite{budget: time.Second}
+	synctest.Test(t, s.run)
+}
+
+// A variable that is also set from a call with several results, a range
+// variable, or a store inside a bubble may hold a fake reading, so it is not a
+// reading of the real clock.
+func checkReadingFromTuple(t *testing.T, now func() (time.Time, error)) {
+	start := time.Now()
+	start, _ = now()
+	if time.Now().Sub(start) > time.Second {
+		t.Fatal("too slow")
+	}
+}
+
+func checkReadingFromRange(t *testing.T, readings []time.Time) {
+	start := time.Now()
+	for _, start = range readings {
+	}
+	if time.Now().Sub(start) > time.Second {
+		t.Fatal("too slow")
+	}
+}
+
+func TestReadingSetInBubble(t *testing.T) {
+	start := time.Now()
+	synctest.Test(t, func(t *testing.T) {
+		start = time.Now()
+	})
+	if time.Now().Sub(start) > time.Second {
+		t.Fatal("too slow")
+	}
+}
+
+func TestSynctestDeclaredLiteral(t *testing.T) {
+	var body = func(t *testing.T) {
+		start := time.Now()
+		time.Sleep(time.Second)
+		if time.Since(start) > time.Second {
+			t.Fatal("too slow")
+		}
+	}
+	synctest.Test(t, body)
+}
+
+// Readings held by declared variables count like those from :=, and a
+// declaration inside a loop restarts the clock each pass.
+func TestDeclaredReadings(t *testing.T) {
+	var start = time.Now()
+	Work()
+	var end time.Time
+	end = time.Now()
+	if end.Sub(start) > time.Second { // want "test asserts on wall-clock elapsed time"
+		t.Fatal("too slow")
+	}
+	for i := 0; i < 3; i++ {
+		var begin = time.Now()
+		Work()
+		if time.Now().Sub(begin) > time.Second { // want "test asserts on wall-clock elapsed time"
+			t.Fatal("too slow")
+		}
+	}
+}
+
+// A clock restarted in the post statement is restarted each pass.
+func TestRestartedInPost(t *testing.T) {
+	start := time.Now()
+	for i := 0; i < 3; i, start = i+1, time.Now() {
+		Work()
+		if time.Since(start) > time.Second { // want "test asserts on wall-clock elapsed time"
+			t.Fatal("too slow")
+		}
+	}
+	for begin := time.Now(); !done(); {
+		if time.Since(begin) > 5*time.Second {
+			t.Fatal("timed out waiting")
+		}
+	}
+}

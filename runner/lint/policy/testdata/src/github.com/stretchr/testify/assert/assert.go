@@ -41,3 +41,11 @@ func NotZero(t TestingT, value any, msgAndArgs ...any) bool {
 func (a *Assertions) Less(e1, e2 any, msgAndArgs ...any) bool {
 	return true
 }
+
+func Equal(t TestingT, expected, actual any, msgAndArgs ...any) bool {
+	return true
+}
+
+func (a *Assertions) Lessf(e1, e2 any, msg string, args ...any) bool {
+	return true
+}

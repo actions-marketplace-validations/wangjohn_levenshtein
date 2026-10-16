@@ -322,10 +322,10 @@ LV1006 only proves that a test can fail. It does not prove the test fails when b
 
 LV1007 reports a test that bounds how long something took by the real clock. A bound such as "returns within 3.6 seconds" or "waits at least 750 milliseconds" holds on an idle machine and fails under `-race` or on a loaded CI runner, so the test fails without the code having changed. It looks at every function in a `_test.go` file, helpers included, and follows a duration measured from the real clock:
 
-- `time.Since(start)`, and `end.Sub(start)` where both sides only ever hold `time.Now()` (or `time.Now().UTC()`, `.Local()`, `.Round(...)`, `.Truncate(...)`).
+- `time.Since(start)`, and `end.Sub(start)` where both sides only ever hold `time.Now()` (or `time.Now().UTC()`, `.Local()`, `.Round(...)`, `.Truncate(...)`). A variable that is also set from anything else, including one result of a multi-value call, a `range` loop, or a store inside a synctest bubble, is not a reading.
 - Values computed from one, such as `elapsed.Milliseconds()`, `float64(elapsed)`, `elapsed / 2`, or `max(slowest, elapsed)`, and the variables that hold them.
 
-It reports such a duration on either side of `<`, `>`, `<=`, or `>=` in an `if` condition whose branch can fail the test, judged the way [LV1006](#tests-that-can-fail-lv1006) judges a test body, and in an assertion call: a testify-style `Less`, `LessOrEqual`, `Greater`, `GreaterOrEqual`, `InDelta`, or `InEpsilon` (or its `f` variant) given the duration, or any call that receives the test value and an ordered comparison on it, such as `require.True(t, elapsed < time.Second)`.
+It reports such a duration on either side of `<`, `>`, `<=`, or `>=` in an `if` condition whose branch can fail the test, judged the way [LV1006](#tests-that-can-fail-lv1006) judges a test body, and in an assertion call: a testify-style `Less`, `LessOrEqual`, `Greater`, `GreaterOrEqual`, `InDelta`, or `InEpsilon` (or its `f` variant) given the duration as one of the two values it compares, or any call that receives the test value followed by an ordered comparison on it, such as `require.True(t, elapsed < time.Second)`. Message arguments after those values, such as `assert.Less(t, len(rs), 10, "after %v", elapsed)`, are not assertions.
 
 ```go
 // Reported: fails whenever the machine is slow, not when Fetch is.
@@ -340,11 +340,18 @@ func TestFetchHonorsTimeout(t *testing.T) {
 
 Three replacements keep the check and drop the flake:
 
-- **Run it under [`testing/synctest`](https://pkg.go.dev/testing/synctest).** Inside `synctest.Test`, the clock advances only when every goroutine in the bubble is blocked, so a measured duration is exact and `elapsed != timeout` is a reliable assertion. Code in a `synctest.Test` or `synctest.Run` callback, a function literal or a named function, is not reported.
+- **Run it under [`testing/synctest`](https://pkg.go.dev/testing/synctest).** Inside `synctest.Test`, the clock advances only when every goroutine in the bubble is blocked, so a measured duration is exact and `elapsed != timeout` is a reliable assertion. Code in a `synctest.Test` or `synctest.Run` callback is not reported: a function literal, a variable holding one, a named function or method value declared in any test file of the package, and every function of the package that bubble code calls, directly or through other such functions. A function that runs in a bubble anywhere is treated as bubble code everywhere, so a helper also called from a real-clock test is not reported there either.
 - **Inject a clock.** Durations from a clock the test controls, such as `clock.Since(start)`, are not real-clock readings and are not reported.
 - **Compare what a stub observes.** To check that a call gets at most a given timeout, have the stub record `ctx.Deadline()` and compare it with `time.Now()` readings taken around the call: `deadline.Sub(before) >= timeout` and `deadline.Sub(after) <= timeout` hold however slow the machine is. A deadline is not a clock reading, so these comparisons are not reported.
 
-Left alone on purpose, to keep false alarms rare: logging a duration (`t.Logf("took %v", elapsed)`, or an `if` whose branch only logs or skips), equality (`elapsed == 0`), `time.Until`, a bound inside a three-clause or condition-only `for` loop, which is usually how long a test polls before giving up, benchmarks and any function literal taking a `*testing.B`, and non-test files. A duration stored in a struct field, slice element, or channel, or passed through a helper before being compared, is not followed. Generated files are skipped.
+Left alone on purpose, to keep false alarms rare:
+
+- Logging a duration: `t.Logf("took %v", elapsed)`, or an `if` whose branch only logs or skips.
+- Equality, such as `elapsed == 0`, and `time.Until`.
+- A polling timeout: a bound, in an `if` or an assertion call, whose innermost loop is a three-clause or condition-only `for` loop that takes none of the clock readings the bound depends on. The test is waiting for a condition, on a clock started before the loop. A loop that restarts the clock each pass measures each pass and is reported, and so is a bound whose innermost loop is a `range` loop, as in a table-driven test.
+- Benchmarks, any function literal taking a `*testing.B`, non-test files, and generated files.
+
+A duration stored in a struct field, slice element, or channel, or passed through a helper before being compared, is not followed.
 
 ## Running the linter directly
 
