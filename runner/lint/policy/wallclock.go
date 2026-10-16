@@ -228,7 +228,7 @@ func checkWallClock(pass *analysis.Pass, body *ast.BlockStmt, bubbles bubbles) {
 		switch n := node.(type) {
 		case *ast.IfStmt:
 			comparison := clock.boundIn(n.Cond)
-			if comparison == nil || !(canFail(pass, n.Body) || failingElse(pass, n.Else)) {
+			if comparison == nil || !canFail(pass, n.Body) && !failingElse(pass, n.Else) {
 				return true
 			}
 			if !clock.polling(comparison, stack) {
