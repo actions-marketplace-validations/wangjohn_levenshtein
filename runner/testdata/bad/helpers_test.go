@@ -3,6 +3,7 @@ package bad
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 // thelper: a helper has to announce itself with t.Helper().
@@ -29,5 +30,14 @@ func TestNoAssertion(t *testing.T) {
 func TestSetenv(t *testing.T) {
 	if err := os.Setenv("LEVENSHTEIN_FIXTURE", "1"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// LV1007: the bound holds on an idle machine and fails on a loaded one.
+func TestFinishesQuickly(t *testing.T) {
+	start := time.Now()
+	expectZero(t, 0)
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("took %v", elapsed)
 	}
 }

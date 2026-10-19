@@ -488,6 +488,7 @@ func house() []*analysis.Analyzer {
 		policy.Spacing,
 		policy.Formatting,
 		policy.Assertions,
+		policy.WallClock,
 	}
 }
 

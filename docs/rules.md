@@ -40,6 +40,7 @@ To silence one finding, put `//lint:ignore <code> <reason>` on the line above it
 | LV1004 | Separate top-level declarations with a blank line ([details](#a-blank-line-between-declarations-lv1004)) |
 | LV1005 | Keep every file formatted the way `gofmt` writes it ([details](#formatted-files-lv1005)) |
 | LV1006 | Give every test a way to fail, and do not skip a test unconditionally ([details](#tests-that-can-fail-lv1006)) |
+| LV1007 | Do not assert on wall-clock time a test measures ([details](#no-wall-clock-assertions-in-tests-lv1007)) |
 
 A few more rules are registered but off; [opt-in rules](#opt-in-rules) lists them.
 
@@ -316,6 +317,43 @@ func TestDouble(t *testing.T) {
 The rule is conservative on purpose: any use of `t` the analysis cannot see into counts as a way to fail, so a helper that receives `t` and never uses it is not reported. Benchmarks, fuzz targets, examples, and `TestMain` are out of scope. Generated files are skipped.
 
 LV1006 only proves that a test can fail. It does not prove the test fails when behavior is wrong. The pinned upstream checks catch assertions that compare a value with itself or a constant with a constant: Staticcheck's `SA4000` for identical operands, and testifylint's `useless-assert` for calls such as `assert.Equal(t, x, x)`. The [`go-mutation`](mutation.md) check goes further and fails when a test does not catch a deliberate change to the code it covers.
+
+## No wall-clock assertions in tests: LV1007
+
+LV1007 reports a test that bounds how long something took by the real clock. A bound such as "returns within 3.6 seconds" or "waits at least 750 milliseconds" holds on an idle machine and fails under `-race` or on a loaded CI runner, so the test fails without the code having changed. It looks at every function in a `_test.go` file, helpers included, and follows a duration measured from the real clock:
+
+- `time.Since(start)`, and `end.Sub(start)` where both sides only ever hold `time.Now()` (or `time.Now().UTC()`, `.Local()`, `.Round(...)`, `.Truncate(...)`). A variable that is also set from anything else, including one result of a multi-value call, a `range` loop, or a store inside a synctest bubble, is not a reading.
+- Values computed from one, such as `elapsed.Milliseconds()`, `float64(elapsed)`, `elapsed / 2`, or `max(slowest, elapsed)`, and the variables that hold them.
+
+It reports such a duration on either side of `<`, `>`, `<=`, or `>=` in an `if` condition whose branch can fail the test, judged the way [LV1006](#tests-that-can-fail-lv1006) judges a test body (an `else` counts, and so does any arm of an `else if` chain), and in an assertion call: a testify-style `Less`, `LessOrEqual`, `Greater`, `GreaterOrEqual`, `InDelta`, or `InEpsilon` (or its `f` variant) given the duration as one of the two values it compares, or any call that receives the test value followed by an ordered comparison on it, such as `require.True(t, elapsed < time.Second)`. A testify function's first argument is its `TestingT` whatever it is, so `require.True(s.T(), elapsed < d)` and an `EventuallyWithT` callback's `assert.True(c, elapsed < d)` count too. An assertion inside an `if` condition is reported once, as the call. Message arguments after those values, such as `assert.Less(t, len(rs), 10, "after %v", elapsed)`, are not assertions.
+
+```go
+// Reported: fails whenever the machine is slow, not when Fetch is.
+func TestFetchHonorsTimeout(t *testing.T) {
+    start := time.Now()
+    Fetch(ctx, hangingServer)
+    if elapsed := time.Since(start); elapsed > 3600*time.Millisecond {
+        t.Fatalf("Fetch took %v", elapsed)
+    }
+}
+```
+
+Three replacements keep the check and drop the flake:
+
+- **Run it under [`testing/synctest`](https://pkg.go.dev/testing/synctest).** Inside `synctest.Test`, the clock advances only when every goroutine in the bubble is blocked, so a measured duration is exact and `elapsed != timeout` is a reliable assertion. Code in a `synctest.Test` or `synctest.Run` callback is not reported: a function literal, a variable holding one, a named function or method value declared in any test file of the package, and every function of the package that bubble code calls, directly or through other such functions. A function that runs in a bubble anywhere is treated as bubble code everywhere, so a helper also called from a real-clock test is not reported there either.
+- **Inject a clock.** Durations from a clock the test controls, such as `clock.Since(start)`, are not real-clock readings and are not reported.
+- **Compare what a stub observes.** To check that a call gets at most a given timeout, have the stub record `ctx.Deadline()` and compare it with `time.Now()` readings taken around the call: `deadline.Sub(before) >= timeout` and `deadline.Sub(after) <= timeout` hold however slow the machine is. A deadline is not a clock reading, so these comparisons are not reported.
+
+Left alone on purpose, to keep false alarms rare:
+
+- Logging a duration: `t.Logf("took %v", elapsed)`, or an `if` whose branch only logs or skips.
+- Equality, such as `elapsed == 0`, and `time.Until`.
+- A polling timeout: a bound, in an `if` or an assertion call, whose innermost loop is a three-clause or condition-only `for` loop, or a `range` over a channel such as a ticker's, and no pass of it restarts the clock a measurement starts from (the argument of `time.Since`, or of `Sub`). The test is waiting for a condition, on a clock started before the loop; a pass may still read `now := time.Now()` for `now.Sub(start)`, and an assignment inside a goroutine or callback in the loop is not part of a pass. A loop that restarts the clock each pass measures each pass and is reported, and so is a bound whose innermost loop is any other `range` loop, as in a table-driven test.
+- Benchmarks, any function literal taking a `*testing.B`, non-test files, and generated files.
+
+For local duration variables, a definite overwrite replaces the earlier measurement. A conditional overwrite or a loop retains any measured value that can still reach the assertion. Variables written by callbacks are tracked conservatively because their value depends on when the callback runs.
+
+A duration stored in a struct field, slice element, or channel, or passed through a helper before being compared, is not followed.
 
 ## Running the linter directly
 
