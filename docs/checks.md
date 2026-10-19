@@ -122,6 +122,10 @@ LV1005 reports Go files whose formatting differs from `gofmt`. See [formatting s
 
 LV1006 reports tests with no way to fail or an unconditional skip before any checks. See [test requirements and limitations](rules.md#tests-that-can-fail-lv1006).
 
+### No wall-clock assertions in tests: LV1007
+
+LV1007 reports tests that bound real elapsed time, such as `time.Since(start) > time.Second` followed by `t.Fatal`. See [what it follows and the replacements](rules.md#no-wall-clock-assertions-in-tests-lv1007).
+
 ### Development and exceptions
 
 Explain a local exception with a lint directive; use a baseline for existing findings you intend to fix. See [suppressing a finding](rules.md#suppressing-a-finding) and [running the linter directly](rules.md#running-the-linter-directly).

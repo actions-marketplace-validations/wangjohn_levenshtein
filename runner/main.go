@@ -131,7 +131,7 @@ var expectedBadCodes = []string{
 	"intrange", "usestdlibvars", "perfsprint", "predeclared", "errname", "exptostd",
 	"minmax", "mapsloop", "slicescontains", "stringscutprefix", "stringsseq",
 	"thelper", "tparallel", "testifylint", "usetesting", "testableexamples",
-	"LV1001", "LV1002", "LV1003", "LV1004", "LV1005", "LV1006",
+	"LV1001", "LV1002", "LV1003", "LV1004", "LV1005", "LV1006", "LV1007",
 }
 
 func (m *Levenshtein) selfTest(ctx context.Context, tools toolchain, nonce string) error {
