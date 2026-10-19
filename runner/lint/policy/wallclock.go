@@ -151,8 +151,9 @@ func synctestBodies(pass *analysis.Pass, files []*ast.File) bubbles {
 	}
 
 	var pending []*ast.BlockStmt
-	addFunc := func(obj types.Object) {
-		if obj == nil || found.funcs[obj] {
+	addFunc := func(fn *types.Func) {
+		obj := fn.Origin()
+		if found.funcs[obj] {
 			return
 		}
 		found.funcs[obj] = true
@@ -166,6 +167,25 @@ func synctestBodies(pass *analysis.Pass, files []*ast.File) bubbles {
 			pending = append(pending, lit.Body)
 		}
 	}
+	addCallback := func(expr ast.Expr) {
+		switch e := ast.Unparen(expr).(type) {
+		case *ast.FuncLit:
+			addLiteral(e)
+		case *ast.Ident:
+			switch obj := pass.TypesInfo.Uses[e].(type) {
+			case *types.Func:
+				addFunc(obj)
+			case *types.Var:
+				for _, lit := range held[obj] {
+					addLiteral(lit)
+				}
+			}
+		case *ast.SelectorExpr:
+			if fn, ok := pass.TypesInfo.Uses[e.Sel].(*types.Func); ok {
+				addFunc(fn)
+			}
+		}
+	}
 	for _, file := range files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
@@ -173,23 +193,7 @@ func synctestBodies(pass *analysis.Pass, files []*ast.File) bubbles {
 				return true
 			}
 			for _, arg := range call.Args {
-				switch a := ast.Unparen(arg).(type) {
-				case *ast.FuncLit:
-					addLiteral(a)
-				case *ast.Ident:
-					switch obj := pass.TypesInfo.Uses[a].(type) {
-					case *types.Func:
-						addFunc(obj)
-					case *types.Var:
-						for _, lit := range held[obj] {
-							addLiteral(lit)
-						}
-					}
-				case *ast.SelectorExpr:
-					if fn, ok := pass.TypesInfo.Uses[a.Sel].(*types.Func); ok {
-						addFunc(fn)
-					}
-				}
+				addCallback(arg)
 			}
 			return true
 		})
@@ -202,8 +206,10 @@ func synctestBodies(pass *analysis.Pass, files []*ast.File) bubbles {
 			if !ok {
 				return true
 			}
-			if fn := typeutil.StaticCallee(pass.TypesInfo, call); fn != nil && fn.Pkg() == pass.Pkg {
-				addFunc(fn.Origin())
+			if fn := typeutil.StaticCallee(pass.TypesInfo, call); fn != nil {
+				addFunc(fn)
+			} else {
+				addCallback(call.Fun)
 			}
 			return true
 		})
@@ -220,6 +226,7 @@ func checkWallClock(pass *analysis.Pass, body *ast.BlockStmt, bubbles bubbles) {
 		return ok && (bubbles.literals[lit] || benchmark(pass, lit.Type))
 	}
 	clock := measureClock(pass, body, skip)
+	clock.uses = clock.durationUses(body, skip)
 
 	ast.PreorderStack(body, nil, func(node ast.Node, stack []ast.Node) bool {
 		if skip(node) {
@@ -313,18 +320,39 @@ func (c wallClock) restarts(body *ast.BlockStmt, post ast.Stmt, starts map[types
 func (c wallClock) startsUnder(expr ast.Expr) map[types.Object]bool {
 	found := map[types.Object]bool{}
 	seen := map[types.Object]bool{}
+	var addStart func(ast.Expr)
+	addStart = func(expr ast.Expr) {
+		ast.Inspect(expr, func(node ast.Node) bool {
+			ident, ok := node.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			obj := c.pass.TypesInfo.Uses[ident]
+			if !c.readings[obj] || seen[obj] {
+				return true
+			}
+			seen[obj] = true
+			for _, value := range c.assigned[obj] {
+				// Copies preserve the original instant. Only the variable
+				// assigned a fresh reading can restart the measurement.
+				ast.Inspect(value, func(node ast.Node) bool {
+					if call, ok := node.(*ast.CallExpr); ok && packageFunc(c.pass, call, "time", "Now") {
+						found[obj] = true
+					}
+					return true
+				})
+				addStart(value)
+			}
+			return true
+		})
+	}
 	var visit func(ast.Expr)
 	visit = func(expr ast.Expr) {
 		ast.Inspect(expr, func(node ast.Node) bool {
 			switch n := node.(type) {
 			case *ast.CallExpr:
 				if start := c.start(n); start != nil {
-					ast.Inspect(start, func(node ast.Node) bool {
-						if ident, ok := node.(*ast.Ident); ok && c.readings[c.pass.TypesInfo.Uses[ident]] {
-							found[c.pass.TypesInfo.Uses[ident]] = true
-						}
-						return true
-					})
+					addStart(start)
 					return false
 				}
 			case *ast.Ident:
@@ -368,6 +396,7 @@ type wallClock struct {
 	assigned map[types.Object][]ast.Expr
 	readings map[types.Object]bool
 	measured map[types.Object]bool
+	uses     map[*ast.Ident]bool
 }
 
 func measureClock(pass *analysis.Pass, body *ast.BlockStmt, skip func(ast.Node) bool) wallClock {
@@ -480,6 +509,9 @@ func (c wallClock) reading(expr ast.Expr) bool {
 func (c wallClock) duration(expr ast.Expr) bool {
 	switch e := ast.Unparen(expr).(type) {
 	case *ast.Ident:
+		if c.uses != nil {
+			return c.uses[e]
+		}
 		return c.measured[c.pass.TypesInfo.Uses[e]]
 	case *ast.UnaryExpr:
 		return c.duration(e.X)

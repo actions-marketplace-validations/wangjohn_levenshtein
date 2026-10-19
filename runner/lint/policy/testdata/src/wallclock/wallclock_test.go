@@ -550,3 +550,124 @@ func TestFailsInElseIf(t *testing.T) {
 		t.Fatal("clock did not move")
 	}
 }
+
+func TestSynctestLocalHelper(t *testing.T) {
+	check := func(t *testing.T) {
+		start := time.Now()
+		time.Sleep(time.Second)
+		if time.Since(start) > time.Second {
+			t.Fatal("too slow")
+		}
+	}
+	var nested = func(t *testing.T) { check(t) }
+
+	synctest.Test(t, func(t *testing.T) { nested(t) })
+}
+
+type genericSuite[T any] struct{}
+
+func (genericSuite[T]) check(t *testing.T) {
+	start := time.Now()
+	time.Sleep(time.Second)
+	if time.Since(start) > time.Second {
+		t.Fatal("too slow")
+	}
+}
+
+func TestSynctestGenericMethod(t *testing.T) {
+	s := genericSuite[int]{}
+	synctest.Test(t, s.check)
+}
+
+func TestPollingCopiedStart(t *testing.T) {
+	start := time.Now()
+	for !done() {
+		begin := start.UTC()
+		var copied = begin
+		if time.Since(copied) > 5*time.Second {
+			t.Fatal("timed out waiting")
+		}
+	}
+}
+
+func TestCopiedRestartedStart(t *testing.T) {
+	for !done() {
+		start := time.Now()
+		begin := start
+		if time.Since(begin) > time.Second { // want "test asserts on wall-clock elapsed time"
+			t.Fatal("too slow")
+		}
+	}
+}
+
+func TestOverwrittenDuration(t *testing.T) {
+	start := time.Now()
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+
+	elapsed = 42 * time.Millisecond
+	if elapsed > time.Second {
+		t.Fatal("bad fixed duration")
+	}
+	assert.Less(t, elapsed, time.Second)
+	copied := elapsed
+	if copied > time.Second {
+		t.Fatal("bad copied duration")
+	}
+
+	elapsed = time.Since(start)
+	assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+}
+
+func checkConditionalOverwrite(t *testing.T, replace bool) {
+	elapsed := time.Since(time.Now())
+	if replace {
+		elapsed = time.Millisecond
+	}
+	assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+
+	if replace {
+		elapsed = time.Millisecond
+	} else {
+		elapsed = 2 * time.Millisecond
+	}
+	assert.Less(t, elapsed, time.Second)
+}
+
+func TestDurationAcrossLoop(t *testing.T) {
+	elapsed := time.Millisecond
+	for range []int{1, 2} {
+		assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+		elapsed = time.Since(time.Now())
+	}
+
+	elapsed = time.Millisecond
+	elapsed += time.Since(time.Now())
+	assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+	elapsed += time.Millisecond
+	assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+}
+
+func TestDurationWrittenByCallback(t *testing.T) {
+	elapsed := time.Millisecond
+	measure := func() { elapsed = time.Since(time.Now()) }
+	measure()
+	assert.Less(t, elapsed, time.Second) // want "test asserts on wall-clock elapsed time"
+}
+
+func TestDurationSwap(t *testing.T) {
+	elapsed := time.Since(time.Now())
+	fixed := time.Millisecond
+	elapsed, fixed = fixed, elapsed
+	assert.Less(t, elapsed, time.Second)
+	assert.Less(t, fixed, time.Second) // want "test asserts on wall-clock elapsed time"
+}
+
+func TestOverwrittenDurationInSubtest(t *testing.T) {
+	t.Run("fixed", func(t *testing.T) {
+		elapsed := time.Since(time.Now())
+		t.Log(elapsed)
+		elapsed = time.Millisecond
+		assert.Less(t, elapsed, time.Second)
+	})
+}

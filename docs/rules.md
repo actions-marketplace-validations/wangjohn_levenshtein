@@ -351,6 +351,8 @@ Left alone on purpose, to keep false alarms rare:
 - A polling timeout: a bound, in an `if` or an assertion call, whose innermost loop is a three-clause or condition-only `for` loop, or a `range` over a channel such as a ticker's, and no pass of it restarts the clock a measurement starts from (the argument of `time.Since`, or of `Sub`). The test is waiting for a condition, on a clock started before the loop; a pass may still read `now := time.Now()` for `now.Sub(start)`, and an assignment inside a goroutine or callback in the loop is not part of a pass. A loop that restarts the clock each pass measures each pass and is reported, and so is a bound whose innermost loop is any other `range` loop, as in a table-driven test.
 - Benchmarks, any function literal taking a `*testing.B`, non-test files, and generated files.
 
+For local duration variables, a definite overwrite replaces the earlier measurement. A conditional overwrite or a loop retains any measured value that can still reach the assertion. Variables written by callbacks are tracked conservatively because their value depends on when the callback runs.
+
 A duration stored in a struct field, slice element, or channel, or passed through a helper before being compared, is not followed.
 
 ## Running the linter directly
