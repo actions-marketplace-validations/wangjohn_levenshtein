@@ -23,6 +23,14 @@ says which interfaces are versioned and what to expect when you bump your pin.
   tests when they bump their pin; record existing ones in a baseline or
   suppress them with `//lint:ignore LV1007 <reason>`.
 
+### Changed
+
+- Upgrade the bundled analyzers and keep lint, community, and SDK code generation
+  on the same x/tools version. Preserve enum checks in cgo-generated files with
+  exhaustive's current API.
+- Upgrade the Dagger engine, Go client, and patched SDK adapter together to
+  0.21.10 so checks can connect with the upgraded client.
+
 ### Security
 
 - Go toolchain bumped from 1.27.1 to 1.27.3 (`.go-version`, the `go.mod`
@@ -33,8 +41,8 @@ says which interfaces are versioned and what to expect when you bump your pin.
   consumers that use the affected packages, so their verify fails. Native Go
   analysis now needs Go 1.27.3; the source launcher downloads it when the host
   Go differs. The patched Dagger SDK now builds its
-  module generator with `golang.org/x/tools` v0.50.0, which reads the export
-  data Go 1.27.2 writes.
+  module generator with `golang.org/x/tools` v0.51.0, which reads the export
+  data Go 1.27.3 writes.
 - The patched Dagger SDK locks `certifi` 2026.10.19 (from 2026.7.22) for
   GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320: earlier bundles trust emSign roots
   whose intermediate CA keys were compromised, which `deps-vuln` reports.
@@ -45,10 +53,6 @@ says which interfaces are versioned and what to expect when you bump your pin.
 ## [0.3.1] - 2026-10-02
 
 ### Fixed
-
-- Upgrade the bundled analyzers and keep lint, community, and SDK code generation
-  on the same x/tools version. Preserve enum checks in cgo-generated files with
-  exhaustive's current API.
 
 - Shortened the GitHub Action description to meet Marketplace metadata
   requirements. The correction requires a new release; existing published
