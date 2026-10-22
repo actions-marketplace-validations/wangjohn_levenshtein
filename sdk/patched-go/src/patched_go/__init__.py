@@ -8,7 +8,8 @@ from dagger import dag, function, object_type
 DAGGER_COMMIT = "02b2558d9997a77bf5d357032c45cdf5bf7d5ce1"
 # github.com/dagger/otel-go v1.43.0, matching the pinned Dagger SDK.
 TELEMETRY_COMMIT = "a9e4d7ae7eb276fe94a2aebc27d08673d50f66b3"
-CLIENT_COMMIT = "02b2558d9997a77bf5d357032c45cdf5bf7d5ce1"
+# dagger.io/dagger v0.21.10 is released from dagger/dagger-go-sdk.
+CLIENT_COMMIT = "53f95d512bcf411dba14197a8c406eed6e5e68e2"
 # Same tag and digest as goImage in runner/toolchain.json; TestPinsAgree in
 # runner/main_test.go fails until they match. This module's Dagger source is
 # sdk/patched-go, so runner/toolchain.json is outside its context, and the
