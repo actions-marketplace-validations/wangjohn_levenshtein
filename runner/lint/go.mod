@@ -39,7 +39,7 @@ require (
 	go-simpler.org/musttag v0.14.0
 	go.augendre.info/fatcontext v0.10.1
 	golang.org/x/mod v0.42.0
-	golang.org/x/tools v0.51.0
+	golang.org/x/tools v0.52.0
 	honnef.co/go/tools v0.8.1
 	mvdan.cc/unparam v0.0.0-20260823230713-2fa3d841b0c8
 )
@@ -60,6 +60,6 @@ require (
 	github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727 // indirect
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 )
