@@ -35,7 +35,7 @@ import (
 	"github.com/ldez/usetesting"
 	"github.com/maratori/testableexamples/pkg/testableexamples"
 	"github.com/moricho/tparallel"
-	"github.com/nishanths/exhaustive"
+	"github.com/nishanths/exhaustive/passes/exhaustive"
 	"github.com/nishanths/predeclared/passes/predeclared"
 	"github.com/polyfloyd/go-errorlint/errorlint"
 	"github.com/raeperd/recvcheck"
@@ -146,7 +146,7 @@ func correctness() []*analysis.Analyzer {
 // imports "C" unchecked. policy.Adapt still drops findings in files that are
 // generated at their source.
 func switches() *analysis.Analyzer {
-	if err := exhaustive.Analyzer.Flags.Set(exhaustive.CheckGeneratedFlag, "true"); err != nil {
+	if err := exhaustive.Analyzer.Flags.Set("g", "true"); err != nil {
 		panic(err)
 	}
 	return exhaustive.Analyzer

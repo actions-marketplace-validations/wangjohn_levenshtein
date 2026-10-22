@@ -1,14 +1,15 @@
-"""Temporary Dagger 0.21.9 Go SDK with patched OpenTelemetry dependencies."""
+"""Temporary Dagger 0.21.10 Go SDK with patched OpenTelemetry dependencies."""
 
 import posixpath
 
 import dagger
 from dagger import dag, function, object_type
 
-DAGGER_COMMIT = "f2aefc20cf41b5ed7922df7244e0f10ddc6031f7"
+DAGGER_COMMIT = "02b2558d9997a77bf5d357032c45cdf5bf7d5ce1"
 # github.com/dagger/otel-go v1.43.0, matching the pinned Dagger SDK.
 TELEMETRY_COMMIT = "a9e4d7ae7eb276fe94a2aebc27d08673d50f66b3"
-CLIENT_COMMIT = "fdf4c34a9a67d096aaeef79630017c9c7ff8fe8e"
+# dagger.io/dagger v0.21.10 is released from dagger/dagger-go-sdk.
+CLIENT_COMMIT = "53f95d512bcf411dba14197a8c406eed6e5e68e2"
 # Same tag and digest as goImage in runner/toolchain.json; TestPinsAgree in
 # runner/main_test.go fails until they match. This module's Dagger source is
 # sdk/patched-go, so runner/toolchain.json is outside its context, and the
@@ -17,7 +18,7 @@ GO_IMAGE = "golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed4
 # The golang.org/x/tools version the generator is built with; it must read the
 # export data that GO_IMAGE's compiler writes. TestPinsAgree in
 # runner/main_test.go keeps it equal to x/tools in runner/lint/go.mod.
-CODEGEN_X_TOOLS = "v0.50.0"
+CODEGEN_X_TOOLS = "v0.51.0"
 LOG_MODULES = (
     "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc",
     "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp",

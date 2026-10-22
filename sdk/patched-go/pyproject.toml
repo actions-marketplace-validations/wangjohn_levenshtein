@@ -4,8 +4,8 @@ version = "0.1.0"
 requires-python = ">=3.14"
 # dagger-io matches the engine in .dagger-version, and uv.lock pins every other
 # dependency with hashes. scripts/test-sdk-lock keeps all three in step.
-dependencies = ["dagger-io==0.21.9"]
+dependencies = ["dagger-io==0.21.10"]
 
 [build-system]
-requires = ["uv_build==0.12.17"]
+requires = ["uv_build==0.13.0"]
 build-backend = "uv_build"
