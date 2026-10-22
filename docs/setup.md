@@ -8,7 +8,7 @@ The source launcher needs Go **1.21 or later** on `PATH`, which supports automat
 
 What else you need depends on the executor of the environments your checks use:
 
-- **Dagger**, the default for a repository without `levenshtein.json`: a Docker-compatible container runtime. The Go SDK then downloads and checksum-verifies Dagger **0.21.9** automatically, and the checks run on the Go and tools pinned in the container.
+- **Dagger**, the default for a repository without `levenshtein.json`: a Docker-compatible container runtime. The Go SDK then downloads and checksum-verifies Dagger **0.21.10** automatically, and the checks run on the Go and tools pinned in the container.
 - **Native**: the Go version in `.go-version` on `PATH`. The [shared Go checks on a native environment](configuration.md#native-go-checks) use the host's `go` as it is, without switching toolchains, and Levenshtein builds or downloads their other pinned tools itself. `go-test` also needs a C compiler, and native `command` checks need whatever their configuration declares. Planning and native checks do not start Dagger and need no container runtime.
 
 On macOS, one option for the container runtime is Colima:

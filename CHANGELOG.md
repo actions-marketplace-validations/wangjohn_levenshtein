@@ -46,6 +46,9 @@ says which interfaces are versioned and what to expect when you bump your pin.
 
 ### Fixed
 
+- Upgrade the Dagger engine, Go client, and patched SDK adapter together to
+  0.21.10 so checks can connect with the upgraded client.
+
 - Shortened the GitHub Action description to meet Marketplace metadata
   requirements. The correction requires a new release; existing published
   tags retain their original metadata.

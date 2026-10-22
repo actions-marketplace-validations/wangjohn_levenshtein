@@ -1,14 +1,14 @@
-"""Temporary Dagger 0.21.9 Go SDK with patched OpenTelemetry dependencies."""
+"""Temporary Dagger 0.21.10 Go SDK with patched OpenTelemetry dependencies."""
 
 import posixpath
 
 import dagger
 from dagger import dag, function, object_type
 
-DAGGER_COMMIT = "f2aefc20cf41b5ed7922df7244e0f10ddc6031f7"
+DAGGER_COMMIT = "02b2558d9997a77bf5d357032c45cdf5bf7d5ce1"
 # github.com/dagger/otel-go v1.43.0, matching the pinned Dagger SDK.
 TELEMETRY_COMMIT = "a9e4d7ae7eb276fe94a2aebc27d08673d50f66b3"
-CLIENT_COMMIT = "fdf4c34a9a67d096aaeef79630017c9c7ff8fe8e"
+CLIENT_COMMIT = "02b2558d9997a77bf5d357032c45cdf5bf7d5ce1"
 # Same tag and digest as goImage in runner/toolchain.json; TestPinsAgree in
 # runner/main_test.go fails until they match. This module's Dagger source is
 # sdk/patched-go, so runner/toolchain.json is outside its context, and the

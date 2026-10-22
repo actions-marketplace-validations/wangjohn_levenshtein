@@ -1,11 +1,11 @@
 # Temporary patched Go SDK
 
-Dagger 0.21.9 forces OpenTelemetry logging dependencies back to v0.16.0,
+Dagger 0.21.10 forces OpenTelemetry logging dependencies back to v0.16.0,
 including the HTTP log exporter affected by GO-2026-4985. Logging 0.20.0
 also has GO-2026-6508 in its gRPC exporter; the fixed release is 0.21.0. Editing the runner's
 `go.mod` alone cannot fix this: module loading regenerates the overrides.
 
-This adapter builds Dagger's own Go generator from the pinned 0.21.9 commit,
+This adapter builds Dagger's own Go generator from the pinned 0.21.10 commit,
 with updated dependency pins in its embedded SDK manifest. It uses the upstream
 `generate-module` and `generate-typedefs` commands and compiles the runner with
 the project's pinned Go image. Generation and runtime compilation therefore
