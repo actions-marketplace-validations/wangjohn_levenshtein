@@ -20,3 +20,11 @@ func complete(state State) {
 	case Ready, Done:
 	}
 }
+
+func intentionallyPartial(state State) {
+	// Other states are handled by the caller.
+	//exhaustive:ignore
+	switch state {
+	case Ready:
+	}
+}
