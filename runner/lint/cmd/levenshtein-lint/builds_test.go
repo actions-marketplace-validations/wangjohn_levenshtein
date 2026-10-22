@@ -16,3 +16,7 @@ func TestOneBuildJudgesTestSensitiveFindings(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), policy.Adapt(unusedParams())[0], "buildparams")
 	analysistest.Run(t, analysistest.TestData(), sumTypes(), "buildsumtypes")
 }
+
+func TestEnumSwitchesInGeneratedFilesAreChecked(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), switches(), "generatedswitches")
+}

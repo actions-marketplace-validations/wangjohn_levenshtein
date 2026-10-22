@@ -225,7 +225,8 @@ func pinnedToolBinary(tools toolchain, tool pinnedTool) *dagger.File {
 }
 
 func executeCheck(ctx context.Context, source *dagger.Directory, module string, tools toolchain, check checkName, scope cacheScope, nonce string) ([]diagnostic, error) {
-	//exhaustive:ignore Other checks use standalone tools below.
+	// Other checks use standalone tools below.
+	//exhaustive:ignore
 	switch check {
 	case checkLint:
 		return lint(ctx, source, module, tools, nonce)

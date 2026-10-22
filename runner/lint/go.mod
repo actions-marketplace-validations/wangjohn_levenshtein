@@ -8,7 +8,7 @@ require (
 	github.com/Antonboom/testifylint v1.6.4
 	github.com/alecthomas/go-check-sumtype v0.5.0
 	github.com/alingse/nilnesserr v0.2.0
-	github.com/breml/bidichk v0.3.3
+	github.com/breml/bidichk v0.3.4
 	github.com/catenacyber/perfsprint v0.10.1
 	github.com/charithe/durationcheck v0.0.11
 	github.com/ckaznocha/intrange v0.3.1
@@ -17,15 +17,15 @@ require (
 	github.com/gostaticanalysis/comment v1.5.0
 	github.com/gostaticanalysis/nilerr v0.1.2
 	github.com/jingyugao/rowserrcheck v1.1.1
-	github.com/kisielk/errcheck v1.20.0
+	github.com/kisielk/errcheck v1.30.0
 	github.com/kkHAIKE/contextcheck v1.1.6
 	github.com/kulti/thelper v0.7.1
 	github.com/ldez/exptostd v0.4.5
 	github.com/ldez/usetesting v0.5.0
 	github.com/maratori/testableexamples v1.0.1
 	github.com/moricho/tparallel v0.3.2
-	github.com/nishanths/exhaustive v0.13.0
-	github.com/nishanths/predeclared v0.2.2
+	github.com/nishanths/exhaustive v0.15.0
+	github.com/nishanths/predeclared v0.3.1
 	github.com/polyfloyd/go-errorlint v1.8.0
 	github.com/raeperd/recvcheck v0.3.1
 	github.com/ryanrolds/sqlclosecheck v0.6.0
@@ -33,13 +33,13 @@ require (
 	github.com/sashamelentyev/usestdlibvars v1.29.0
 	github.com/sonatard/noctx v0.5.1
 	github.com/timakin/bodyclose v0.0.0-20260723120731-857993a2939c
-	github.com/timonwong/loggercheck v0.12.0
-	github.com/uudashr/gocognit v1.2.1
+	github.com/timonwong/loggercheck v0.13.0
+	github.com/uudashr/gocognit v1.3.0
 	github.com/ykadowak/zerologlint v0.1.5
 	go-simpler.org/musttag v0.14.0
 	go.augendre.info/fatcontext v0.10.1
-	golang.org/x/mod v0.41.0
-	golang.org/x/tools v0.50.0
+	golang.org/x/mod v0.42.0
+	golang.org/x/tools v0.51.0
 	honnef.co/go/tools v0.8.1
 	mvdan.cc/unparam v0.0.0-20260823230713-2fa3d841b0c8
 )
