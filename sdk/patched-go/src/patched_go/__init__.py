@@ -17,7 +17,7 @@ GO_IMAGE = "golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed4
 # The golang.org/x/tools version the generator is built with; it must read the
 # export data that GO_IMAGE's compiler writes. TestPinsAgree in
 # runner/main_test.go keeps it equal to x/tools in runner/lint/go.mod.
-CODEGEN_X_TOOLS = "v0.50.0"
+CODEGEN_X_TOOLS = "v0.51.0"
 LOG_MODULES = (
     "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc",
     "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp",

@@ -46,6 +46,10 @@ says which interfaces are versioned and what to expect when you bump your pin.
 
 ### Fixed
 
+- Upgrade the bundled analyzers and keep lint, community, and SDK code generation
+  on the same x/tools version. Preserve enum checks in cgo-generated files with
+  exhaustive's current API.
+
 - Shortened the GitHub Action description to meet Marketplace metadata
   requirements. The correction requires a new release; existing published
   tags retain their original metadata.
